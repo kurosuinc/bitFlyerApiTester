@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Linq;
 using System.Net.Http;
+using System.Security.Authentication;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
@@ -29,26 +30,35 @@ namespace BitFlyerApiTester
 
             Hr();
 
-            using (var hc = new HttpClient())
+            using (var handler = new WebRequestHandler())
             {
-                var path = "/v1/me/getpermissions";
-                var req = new HttpRequestMessage(HttpMethod.Get, $"https://api.bitflyer.com{path}");
+                // SSLのプロトコルを TLS1.2 に指定
+                //handler.SslProtocols = SslProtocols.Tls12;
 
-                var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString();
-                var content = timestamp + req.Method + path;
-                var hash = new HMACSHA256(Encoding.UTF8.GetBytes(secret)).ComputeHash(Encoding.UTF8.GetBytes(content));
+                // SSL証明書の検証を全く行わなくする
+                //handler.ServerCertificateValidationCallback = (sender, certificate, chain, sslPolicyErrors) => true;
 
-                req.Headers.TryAddWithoutValidation("ACCESS-KEY", key);
-                req.Headers.TryAddWithoutValidation("ACCESS-TIMESTAMP", timestamp);
-                req.Headers.TryAddWithoutValidation("ACCESS-SIGN", hash.ToHexString());
+                using (var hc = new HttpClient(handler))
+                {
+                    var path = "/v1/me/getpermissions";
+                    var req = new HttpRequestMessage(HttpMethod.Get, $"https://api.bitflyer.com{path}");
 
-                var res = await hc.SendAsync(req).ConfigureAwait(false);
-                var json = await res.Content.ReadAsStringAsync();
+                    var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString();
+                    var content = timestamp + req.Method + path;
+                    var hash = new HMACSHA256(Encoding.UTF8.GetBytes(secret)).ComputeHash(Encoding.UTF8.GetBytes(content));
 
-                Console.WriteLine("HTTP Status code:");
-                Console.WriteLine(res.StatusCode);
-                Console.WriteLine("Response body:");
-                Console.WriteLine(json);
+                    req.Headers.TryAddWithoutValidation("ACCESS-KEY", key);
+                    req.Headers.TryAddWithoutValidation("ACCESS-TIMESTAMP", timestamp);
+                    req.Headers.TryAddWithoutValidation("ACCESS-SIGN", hash.ToHexString());
+
+                    var res = await hc.SendAsync(req).ConfigureAwait(false);
+                    var json = await res.Content.ReadAsStringAsync();
+
+                    Console.WriteLine("HTTP Status code:");
+                    Console.WriteLine(res.StatusCode);
+                    Console.WriteLine("Response body:");
+                    Console.WriteLine(json);
+                }
             }
 
             Hr();
